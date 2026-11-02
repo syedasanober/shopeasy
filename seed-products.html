@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>ShopEasy Product Importer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        button {
+            padding: 12px 20px;
+            background: #5b4bdb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        #status {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ShopEasy Product Importer</h1>
+    <p>This will import the sample product catalogue into your local database.</p>
+    <button id="importButton">Import Products</button>
+    <div id="status">Ready.</div>
+
+    <script>
+        const API = "http://localhost:8080/api";
+        const button = document.getElementById("importButton");
+        const statusBox = document.getElementById("status");
+
+        button.addEventListener("click", async() => {
+            button.disabled = true;
+            let added = 0;
+            let skipped = 0;
+            let failed = 0;
+
+            try {
+                statusBox.textContent = "Loading sample products...";
+
+                const sourceResponse = await fetch(
+                    "https://dummyjson.com/products?limit=0"
+                );
+                if (!sourceResponse.ok) {
+                    throw new Error("Could not load the sample catalogue.");
+                }
+
+                const sourceData = await sourceResponse.json();
+                const products = sourceData.products;
+
+                const localResponse = await fetch(
+                    `${API}/products?size=1000&page=0`
+                );
+                if (!localResponse.ok) {
+                    throw new Error("Could not read your ShopEasy database.");
+                }
+
+                const localData = await localResponse.json();
+                const names = new Set(
+                    (localData.content || []).map(
+                        p => p.name.trim().toLowerCase()
+                    )
+                );
+
+                for (let i = 0; i < products.length; i++) {
+                    const p = products[i];
+                    const name = (p.title || "").trim();
+
+                    if (!name || names.has(name.toLowerCase())) {
+                        skipped++;
+                        continue;
+                    }
+
+                    const product = {
+                        name: name,
+                        category: p.category || "General",
+                        description: p.description || "",
+                        price: Math.round(Number(p.price || 0) * 85 * 100) / 100,
+                        imageUrl: p.thumbnail || p.images ? .[0] || "",
+                        brand: p.brand || "ShopEasy",
+                        rating: Number(p.rating || 4),
+                        stock: Number(p.stock || 0)
+                    };
+
+                    try {
+                        const response = await fetch(`${API}/products`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify(product)
+                        });
+
+                        if (response.ok) {
+                            added++;
+                            names.add(name.toLowerCase());
+                        } else {
+                            failed++;
+                        }
+                    } catch {
+                        failed++;
+                    }
+
+                    statusBox.textContent =
+                        `Processing ${i + 1} of ${products.length}\n` +
+                        `Added: ${added}\nSkipped: ${skipped}\nFailed: ${failed}`;
+                }
+
+                statusBox.textContent += "\n\nImport finished!";
+            } catch (error) {
+                statusBox.textContent = "Import stopped:\n" + error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

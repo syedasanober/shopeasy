@@ -1,0 +1,21 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Local database configuration
+application-local.properties
+application-dev.properties
+
+# Java build files
+backend/target/
+target/
+
+# IDE files
+.idea/
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.dbbackend/error.txt
+/backend/error.txt
